@@ -1,6 +1,8 @@
-# herex
+<p align="center">
+  <img src="assets/logo.png" alt="herex" width="128">
+</p>
 
-<img src="assets/logo.png" alt="herex" width="128" align="right">
+# herex
 
 Multi-line string literals with interpolation for Haxe.
 
