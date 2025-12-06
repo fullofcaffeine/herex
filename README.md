@@ -1,227 +1,118 @@
 # herex
 
-Heredoc-like multi-line string literals with interpolation for Haxe, built on tink_hxx.
+Multi-line string literals with interpolation for Haxe.
 
-## Features
+```haxe
+var name = "World";
+var text = <heredoc>Hello $name!</heredoc>;
+// "Hello World!"
+```
 
-- **Native-feeling syntax** - write `<heredoc>...</heredoc>` directly in your code
-- Multi-line strings with preserved formatting and linebreaks
-- `$var` interpolation for simple variables
-- `${expr}` interpolation for expressions (math, array access, etc.)
-- `$$` for literal dollar signs
-- Configurable whitespace handling (preserve, dedent, trim)
-- Automatic type coercion (Int, Float, Bool → String)
+## Requirements
+
+- Haxe 4.0+
+- lix package manager (recommended)
 
 ## Installation
 
 ```bash
-# Using lix (recommended)
-lix scope create
-lix install gh:haxetink/tink_hxx
-lix install gh:haxetink/tink_syntaxhub
+lix install gh:fullofcaffeine/herex
 ```
+
+Dependencies are installed automatically:
+
+- `tink_hxx` - markup parsing
+- `tink_syntaxhub` - direct syntax support
 
 ## Setup
 
 Add to your `build.hxml`:
 
 ```
--lib tink_hxx
--lib tink_macro
+-lib herex
 -lib tink_syntaxhub
 --macro tink.SyntaxHub.use()
 --macro HeredocSyntax.use()
--main YourMain
---interp
 ```
 
 ## Usage
 
 ```haxe
-class Example {
-  public static function main() {
-    var name = "World";
-    var count = 42;
+var user = "Alice";
+var count = 42;
 
-    // Simple interpolation
-    var greeting = <heredoc>Hello $name!</heredoc>;
-    trace(greeting);  // "Hello World!"
+// Basic interpolation
+var msg = <heredoc>Hello $user!</heredoc>;
 
-    // Expression interpolation
-    var math = <heredoc>The answer is ${count * 2}.</heredoc>;
-    trace(math);  // "The answer is 84."
+// Expressions
+var result = <heredoc>Total: ${count * 2}</heredoc>;
 
-    // Multi-line with preserved linebreaks
-    var poem = <heredoc>Roses are red,
-Violets are blue,
-$name is awesome,
-And so are you!</heredoc>;
+// Multi-line
+var query = <heredoc>
+  SELECT * FROM users
+  WHERE name = '$user'
+</heredoc>;
 
-    // Literal dollar signs
-    var price = <heredoc>Total: $$${count}.00</heredoc>;
-    trace(price);  // "Total: $42.00"
-  }
-}
+// Literal dollar sign
+var price = <heredoc>Cost: $$99</heredoc>;
 ```
 
 ## Whitespace Modes
 
-| Mode | Description |
-|------|-------------|
-| (default) | Preserve all whitespace as-is |
-| `dedent` | Remove common leading indentation |
-| `trim` | Trim leading/trailing whitespace |
-| `dedent-trim` | Dedent then trim |
-
 ```haxe
-// Without mode - preserves indentation
+// Default: preserve all whitespace
 var raw = <heredoc>
-      Line 1
-      Line 2
+  indented
 </heredoc>;
-// Result: "\n      Line 1\n      Line 2\n"
+// "\n  indented\n"
 
-// With dedent-trim - clean output
+// dedent: remove common indentation
+var dedented = <heredoc mode="dedent">
+  line 1
+  line 2
+</heredoc>;
+// "\nline 1\nline 2\n"
+
+// trim: remove leading/trailing whitespace
+var trimmed = <heredoc mode="trim">
+  content
+</heredoc>;
+// "content"
+
+// dedent-trim: both
 var clean = <heredoc mode="dedent-trim">
-      Line 1
-      Line 2
+  line 1
+  line 2
 </heredoc>;
-// Result: "Line 1\nLine 2"
+// "line 1\nline 2"
 ```
 
-## Interpolation
+## Without SyntaxHub
 
-| Syntax | Description | Example |
-|--------|-------------|---------|
-| `$var` | Simple variable | `$name` → value of name |
-| `${expr}` | Expression | `${arr[0]}` → first element |
-| `$$` | Literal $ | `$$100` → "$100" |
-
-```haxe
-var name = "Alice";
-var items = [10, 20, 30];
-
-var text = <heredoc>
-User: $name
-First item: ${items[0]}
-Total: $$${items[0] + items[1] + items[2]}
-</heredoc>;
-```
-
-## Linebreaks
-
-Heredocs preserve linebreaks exactly like Node.js template literals:
-
-```haxe
-var name = "World";
-var text = <heredoc>Line 1
-Line 2
-$name
-Line 4</heredoc>;
-// Result: "Line 1\nLine 2\nWorld\nLine 4"
-```
-
-Unlike JSX/HTML templates where whitespace around elements is normalized, heredocs preserve all newlines including those adjacent to interpolated expressions.
-
-## Complete Example
-
-```haxe
-class Example {
-  public static function main() {
-    var user = "admin";
-    var table = "users";
-
-    // SQL query with dedent-trim
-    var sql = <heredoc mode="dedent-trim">
-      SELECT *
-      FROM $table
-      WHERE username = '$user'
-      ORDER BY created_at DESC
-    </heredoc>;
-
-    // HTML template
-    var html = <heredoc mode="dedent-trim">
-      <div class="greeting">
-        <h1>Welcome, $user!</h1>
-        <p>You are logged in.</p>
-      </div>
-    </heredoc>;
-
-    // JSON with expressions
-    var count = 42;
-    var json = <heredoc mode="dedent-trim">
-      {
-        "user": "$user",
-        "count": ${count},
-        "active": true
-      }
-    </heredoc>;
-  }
-}
-```
-
-## How It Works
-
-The macro generates optimized code at **compile time**:
-
-| Input | Generated Code |
-|-------|----------------|
-| `<heredoc>Hello!</heredoc>` | `"Hello!"` |
-| `<heredoc>Hello $name!</heredoc>` | `"Hello " + Std.string(name) + "!"` |
-| `<heredoc mode="trim">  text  </heredoc>` | `"text"` |
-
-**No runtime overhead** for simple cases - just plain string literals or concatenation.
-
-### Processing Steps
-
-1. **Parsing**: Haxe's parser recognizes `<heredoc>` as a markup literal
-2. **Interception**: SyntaxHub's `HeredocSyntax` plugin intercepts `@:markup` expressions
-3. **Code Generation**: The macro generates optimized expressions:
-   - Static content → string literal
-   - Interpolated → direct `+` concatenation
-   - Whitespace modes → applied at compile time when possible
-
-## Alternative: Explicit Macro
-
-If you can't use SyntaxHub, you can call the macro explicitly:
+If you can't use SyntaxHub, call the macro directly:
 
 ```haxe
 var text = Heredoc.hxx(<heredoc>Hello $name!</heredoc>);
 ```
 
-**build.hxml** (without SyntaxHub):
 ```
--lib tink_hxx
--lib tink_macro
--main Example
---interp
+-lib herex
 ```
 
-## Files
+## How it works
 
-| File | Description |
-|------|-------------|
-| `Heredoc.hx` | Main library - macro and heredoc function |
-| `HeredocSyntax.hx` | SyntaxHub plugin for direct syntax |
-| `HeredocTest.hx` | Test suite (explicit macro syntax) |
-| `DirectTest.hx` | Test suite (direct syntax) |
-| `LinebreakTest.hx` | Test suite (linebreak preservation) |
+The macro parses `<heredoc>` at compile time and generates string concatenation:
 
-## Build & Test
+```haxe
+// This:
+var x = <heredoc>Hello $name!</heredoc>;
 
-```bash
-# Run tests (direct syntax - preferred)
-haxe -lib tink_hxx -lib tink_macro -lib tink_syntaxhub \
-  --macro "tink.SyntaxHub.use()" \
-  --macro "HeredocSyntax.use()" \
-  -main DirectTest --interp
-
-# Run linebreak tests
-haxe -lib tink_hxx -lib tink_macro -main LinebreakTest --interp
+// Becomes:
+var x = "Hello " + Std.string(name) + "!";
 ```
 
-## References
+Static content compiles to string literals. Whitespace modes are applied at compile time when possible.
 
-- [tink_hxx](https://github.com/haxetink/tink_hxx) - The HXX parser library
-- [tink_syntaxhub](https://github.com/haxetink/tink_syntaxhub) - Global syntax transformation
-- [Haxe Markup Literals](https://haxe.org/manual/lf-markup.html) - Built-in markup support
+## License
+
+MIT

@@ -1,0 +1,13 @@
+{
+  "name": "herex",
+  "version": "1.0.0",
+  "description": "Multi-line string literals with interpolation for Haxe",
+  "url": "https://github.com/fullofcaffeine/herex",
+  "license": "MIT",
+  "dependencies": {
+    "tink_hxx": "",
+    "tink_macro": "",
+    "tink_syntaxhub": ""
+  },
+  "classPath": ""
+}
