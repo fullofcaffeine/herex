@@ -4,7 +4,7 @@
 
 # herex
 
-Multi-line string literals with interpolation for Haxe.
+Multi-line string literals with interpolation for [Haxe](https://github.com/HaxeFoundation/haxe).
 
 ```haxe
 var name = "World";
