@@ -1,0 +1,7 @@
+-lib tink_hxx
+-lib tink_macro
+-lib tink_syntaxhub
+--macro tink.SyntaxHub.use()
+--macro HeredocSyntax.use()
+-main HeredocTest
+--interp

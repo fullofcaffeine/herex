@@ -1,0 +1,38 @@
+# Haxe build outputs
+bin/
+out/
+export/
+*.n
+*.hl
+
+# Lix/Haxelib dependencies (managed by lix)
+haxe_libraries/
+
+# IDE and editor files
+.idea/
+*.iml
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# Test outputs
+dump/
+
+# Beads issue tracker (local dev only)
+.beads/
+
+# Claude Code settings
+.claude/
