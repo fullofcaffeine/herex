@@ -64,23 +64,15 @@
  * var text = Heredoc.hxx(<heredoc>Hello $name!</heredoc>);
  * ```
  *
- * ## How It Works
+ * ## How It Works (Compile-Time Optimization)
  *
- * 1. Haxe's parser recognizes `<heredoc>...</heredoc>` as a markup literal
- * 2. SyntaxHub's `HeredocSyntax` plugin intercepts `@:markup` expressions
- * 3. tink_hxx parses content (with Preserve whitespace mode), splitting text and interpolations
- * 4. The `heredoc` function receives children as `Array<Any>`
- * 5. Children are converted to strings with `Std.string()` and joined
+ * The macro generates efficient code at compile time:
  *
- * ### Why Array<Any>?
+ * 1. `<heredoc>Hello $name!</heredoc>` compiles to `"Hello " + name + "!"`
+ * 2. Static heredocs become string literals: `<heredoc>Hello!</heredoc>` → `"Hello!"`
+ * 3. Whitespace modes (dedent/trim) are applied at compile time when possible
  *
- * When tink_hxx parses `Hello $name!`, it creates multiple children:
- * - CText("Hello ")
- * - CExpr(name)  // the variable reference
- * - CText("!")
- *
- * Using `Array<Any>` allows us to accept any expression type (String, Int, Bool, etc.)
- * and convert them all to strings.
+ * No runtime overhead for simple cases - just plain string concatenation.
  *
  * @see HeredocSyntax For the SyntaxHub plugin that enables direct syntax
  * @see https://github.com/haxetink/tink_hxx The underlying HXX parser
@@ -88,7 +80,6 @@
 #if macro
 import haxe.macro.Expr;
 import haxe.macro.Context;
-import haxe.macro.Type;
 
 using tink.MacroApi;
 #end
@@ -96,94 +87,20 @@ using tink.MacroApi;
 /**
  * Main heredoc implementation class.
  *
- * Provides both the runtime `heredoc()` function that processes content,
- * and the compile-time `hxx()` macro that parses the HXX syntax.
+ * Provides the compile-time `hxx()` macro that parses heredoc syntax and
+ * generates optimized string concatenation code.
  */
 class Heredoc {
-  /**
-   * Runtime function that processes heredoc content.
-   *
-   * This function is called by the generated code after tink_hxx parses the
-   * `<heredoc>` tag. It receives the parsed children and optional mode attribute.
-   *
-   * ## Parameters
-   *
-   * @param attr Anonymous object containing:
-   *   - `mode` (optional): Whitespace handling mode
-   *     - `null` or `"preserve"`: Keep all whitespace as-is (default)
-   *     - `"dedent"`: Remove common leading indentation from all lines
-   *     - `"trim"`: Trim leading/trailing whitespace from entire string
-   *     - `"dedent-trim"`: Apply dedent, then trim
-   *   - `children`: Array of content pieces (text and interpolated values)
-   *     Automatically populated by tink_hxx from the tag's content.
-   *
-   * @return The assembled string with all children joined and whitespace processed
-   *
-   * ## How Children Work
-   *
-   * For `<heredoc>Hello $name, you have ${count} items</heredoc>`:
-   *
-   * tink_hxx parses this into children array:
-   * ```
-   * ["Hello ", name, ", you have ", count, " items"]
-   * ```
-   *
-   * We convert each to string and join:
-   * ```
-   * "Hello " + Std.string(name) + ", you have " + Std.string(count) + " items"
-   * ```
-   */
-  public static function heredoc(attr:{?mode:String, children:Array<Any>}):String {
-    // Convert all children to strings and concatenate
-    var raw = [for (c in attr.children) Std.string(c)].join("");
-
-    // Apply whitespace processing based on mode
-    return switch attr.mode {
-      case "dedent": dedentString(raw);
-      case "trim": StringTools.trim(raw);
-      case "dedent-trim": StringTools.trim(dedentString(raw));
-      default: raw; // "preserve" or null - keep as-is
-    };
-  }
-
+  #if macro
   /**
    * Removes common leading indentation from all lines in a string.
-   *
-   * This is useful for heredocs embedded in indented code blocks, allowing
-   * the content to align with the surrounding code while producing clean output.
-   *
-   * ## Algorithm
-   *
-   * 1. Split string into lines
-   * 2. Find the minimum indentation across all non-empty lines (skipping first line
-   *    which tink_hxx may have already trimmed)
-   * 3. Remove that many spaces/tabs from the start of each line
-   *
-   * ## Example
-   *
-   * Input (6 spaces of indentation):
-   * ```
-   * "Line 1
-   *       Line 2
-   *       Line 3"
-   * ```
-   *
-   * Output (indentation removed):
-   * ```
-   * "Line 1
-   * Line 2
-   * Line 3"
-   * ```
-   *
-   * @param s The string to dedent
-   * @return The dedented string with common indentation removed
+   * Compile-time version for use in macros.
    */
   static function dedentString(s:String):String {
     var lines = s.split("\n");
     if (lines.length <= 1) return s;
 
     // Find minimum indentation (ignoring empty lines and first line)
-    // First line is skipped because tink_hxx often trims its leading whitespace
     var minIndent = 999999;
     var isFirst = true;
     for (line in lines) {
@@ -192,14 +109,14 @@ class Heredoc {
 
       var indent = 0;
       for (i in 0...line.length) {
-        if (line.charAt(i) == " ") indent++;
-        else if (line.charAt(i) == "\t") indent += 4; // Tab = 4 spaces
+        var c = line.charAt(i);
+        if (c == " ") indent++;
+        else if (c == "\t") indent += 4;
         else break;
       }
       if (indent < minIndent) minIndent = indent;
     }
 
-    // If no indentation found or only first line has content, return as-is
     if (minIndent == 0 || minIndent == 999999) return s;
 
     // Remove the common indentation from each line
@@ -207,20 +124,20 @@ class Heredoc {
     isFirst = true;
     for (line in lines) {
       if (isFirst) {
-        result.push(line); // Keep first line as-is
+        result.push(line);
         isFirst = false;
         continue;
       }
       if (StringTools.trim(line).length == 0) {
-        result.push(""); // Empty lines become truly empty
+        result.push("");
       } else {
-        // Remove up to minIndent characters of whitespace
         var removed = 0;
         var start = 0;
         for (i in 0...line.length) {
           if (removed >= minIndent) break;
-          if (line.charAt(i) == " ") { removed++; start++; }
-          else if (line.charAt(i) == "\t") { removed += 4; start++; }
+          var c = line.charAt(i);
+          if (c == " ") { removed++; start++; }
+          else if (c == "\t") { removed += 4; start++; }
           else break;
         }
         result.push(line.substr(start));
@@ -229,103 +146,236 @@ class Heredoc {
     return result.join("\n");
   }
 
-  #if macro
   /**
-   * Creates a tink_hxx Tag definition for the `<heredoc>` tag.
-   *
-   * This is called during macro expansion to register `heredoc` as a valid
-   * HXX tag that maps to `Heredoc.heredoc()`.
-   *
-   * ## Why This is Needed
-   *
-   * tink_hxx resolves tag names to functions. When it sees `<heredoc>`, it needs
-   * to know which function to call. This method:
-   *
-   * 1. Looks up the `Heredoc` class type
-   * 2. Finds the `heredoc` static function
-   * 3. Creates a Tag declaration with path "Heredoc.heredoc"
-   *
-   * The full path ensures the generated code can find the function regardless
-   * of imports in the user's code.
-   *
-   * @param pos The source position for error reporting
-   * @return A Tag definition for the heredoc function, or null if not found
+   * Apply whitespace mode to a string at compile time.
    */
-  static function getHeredocTag(pos:haxe.macro.Expr.Position):tink.hxx.Tag {
-    var type = Context.getType("Heredoc");
-    var classType = switch type {
-      case TInst(r, _): r.get();
-      default: null;
+  static function applyMode(s:String, mode:String):String {
+    return switch mode {
+      case "dedent": dedentString(s);
+      case "trim": StringTools.trim(s);
+      case "dedent-trim": StringTools.trim(dedentString(s));
+      default: s;
     };
-    if (classType == null) return null;
+  }
 
-    for (f in classType.statics.get()) {
-      if (f.name == "heredoc") {
-        // Use full path so generated code doesn't need imports
-        return tink.hxx.Tag.declaration("Heredoc.heredoc", pos, f.type, []);
+  /**
+   * Build a concatenation expression from parts.
+   * Optimizes by combining adjacent string literals.
+   */
+  static function buildConcat(parts:Array<Expr>, pos:Position):Expr {
+    if (parts.length == 0) return macro @:pos(pos) "";
+    if (parts.length == 1) return parts[0];
+
+    // Optimize: combine adjacent string literals
+    var optimized:Array<Expr> = [];
+    var currentStr:String = null;
+    var currentPos:Position = null;
+
+    for (part in parts) {
+      switch part.expr {
+        case EConst(CString(s, _)):
+          if (currentStr == null) {
+            currentStr = s;
+            currentPos = part.pos;
+          } else {
+            currentStr += s;
+          }
+        default:
+          if (currentStr != null) {
+            optimized.push({ expr: EConst(CString(currentStr, null)), pos: currentPos });
+            currentStr = null;
+          }
+          optimized.push(part);
       }
     }
-    return null;
+    if (currentStr != null) {
+      optimized.push({ expr: EConst(CString(currentStr, null)), pos: currentPos });
+    }
+
+    if (optimized.length == 0) return macro @:pos(pos) "";
+    if (optimized.length == 1) return optimized[0];
+
+    // Build the concatenation chain
+    var result = optimized[0];
+    for (i in 1...optimized.length) {
+      result = macro @:pos(pos) $result + ${optimized[i]};
+    }
+    return result;
   }
   #end
 
   /**
    * Compile-time macro that parses HXX heredoc syntax.
    *
-   * This is the main entry point for heredoc processing. It:
-   *
-   * 1. Registers the `heredoc` tag with tink_hxx's generator
-   * 2. Parses the input expression as HXX markup
-   * 3. Returns generated code that calls `Heredoc.heredoc()`
-   *
-   * ## Usage
-   *
-   * ```haxe
-   * var text = Heredoc.hxx(<heredoc>Hello $name!</heredoc>);
-   * ```
-   *
-   * ## What Gets Generated
-   *
-   * For `<heredoc>Hello $name!</heredoc>`, this macro generates approximately:
-   *
-   * ```haxe
-   * Heredoc.heredoc({
-   *   mode: null,
-   *   children: ["Hello ", name, "!"]
-   * })
-   * ```
-   *
-   * The actual generated code uses tink_hxx's optimized array building.
-   *
-   * ## Direct Syntax Alternative
-   *
-   * If you enable `HeredocSyntax` via SyntaxHub, you can skip this wrapper:
-   * ```haxe
-   * var text = <heredoc>Hello $name!</heredoc>;  // No Heredoc.hxx() needed
-   * ```
+   * Generates optimized code:
+   * - `<heredoc>Hello $name!</heredoc>` → `"Hello " + name + "!"`
+   * - `<heredoc>Static text</heredoc>` → `"Static text"`
+   * - Whitespace modes applied at compile time when possible
    *
    * @param e The expression containing the `<heredoc>` markup
-   * @return Generated code that evaluates to the interpolated string
-   *
-   * @see HeredocSyntax For enabling direct syntax without the wrapper
+   * @return Generated string concatenation expression
    */
   public macro static function hxx(e:Expr):Expr {
-    // Register heredoc as a known tag with tink_hxx
-    var defaults = [new tink.core.Named("heredoc", getHeredocTag)];
-
-    // Create generator context with our defaults
-    var ctx = new tink.hxx.Generator(defaults).createContext();
-
-    // Parse and generate code with Preserve whitespace mode
-    // Unlike JSX, heredocs must preserve linebreaks around interpolations
-    return ctx.generateRoot(tink.hxx.Parser.parseRoot(e, {
+    // Parse the heredoc using tink_hxx
+    var parsed = tink.hxx.Parser.parseRoot(e, {
       defaultExtension: 'hxx',
-      noControlStructures: false,
-      defaultSwitchTarget: macro __data__,
-      isVoid: ctx.isVoid,
+      noControlStructures: true,
+      defaultSwitchTarget: null,
+      isVoid: function(_) return false,
       fragment: null,
       whitespace: tink.hxx.Parser.ParseWhitespace.Preserve,
-      treatNested: function(children) return ctx.generateRoot.bind(children).bounce(),
-    }));
+      treatNested: null,
+    });
+
+    // Extract the heredoc node
+    if (parsed.value.length != 1) {
+      Context.error("Expected exactly one heredoc tag", e.pos);
+      return macro "";
+    }
+
+    var node = parsed.value[0];
+    var tagName:String = null;
+    var mode:String = null;
+    var children:Array<tink.hxx.Node.Child> = null;
+
+    switch node.value {
+      case CNode(n):
+        tagName = n.name.value;
+        children = n.children != null ? n.children.value : [];
+        // Extract mode attribute
+        if (n.attributes != null) {
+          for (attr in n.attributes) {
+            switch attr {
+              case Regular(name, value) if (name.value == "mode"):
+                switch value.expr {
+                  case EConst(CString(s, _)): mode = s;
+                  default:
+                }
+              default:
+            }
+          }
+        }
+      default:
+        Context.error("Expected heredoc tag", e.pos);
+        return macro "";
+    }
+
+    if (tagName != "heredoc") {
+      Context.error('Expected <heredoc> tag, got <$tagName>', e.pos);
+      return macro "";
+    }
+
+    // Check if all children are static (CText only)
+    var allStatic = true;
+    var staticParts:Array<String> = [];
+
+    for (child in children) {
+      switch child.value {
+        case CText(t):
+          staticParts.push(t.value);
+        default:
+          allStatic = false;
+          break;
+      }
+    }
+
+    // If all static, process at compile time
+    if (allStatic) {
+      var result = staticParts.join("");
+      if (mode != null) {
+        result = applyMode(result, mode);
+      }
+      return macro @:pos(e.pos) $v{result};
+    }
+
+    // Has expressions - generate concatenation
+    var parts:Array<Expr> = [];
+
+    for (child in children) {
+      switch child.value {
+        case CText(t):
+          if (t.value.length > 0) {
+            parts.push({ expr: EConst(CString(t.value, null)), pos: child.pos });
+          }
+        case CExpr(expr):
+          // Wrap non-string expressions with Std.string()
+          parts.push(macro @:pos(expr.pos) Std.string($expr));
+        case CNode(n):
+          Context.error("Nested tags not supported in heredoc", child.pos);
+        default:
+          Context.error("Unsupported child type in heredoc", child.pos);
+      }
+    }
+
+    var concatExpr = buildConcat(parts, e.pos);
+
+    // If mode is set, we need runtime processing for dedent
+    // (can't dedent at compile time when expressions are involved)
+    if (mode != null) {
+      return switch mode {
+        case "trim":
+          macro @:pos(e.pos) StringTools.trim($concatExpr);
+        case "dedent":
+          macro @:pos(e.pos) Heredoc.dedentRuntime($concatExpr);
+        case "dedent-trim":
+          macro @:pos(e.pos) StringTools.trim(Heredoc.dedentRuntime($concatExpr));
+        default:
+          concatExpr;
+      };
+    }
+
+    return concatExpr;
+  }
+
+  /**
+   * Runtime dedent function - only used when expressions are present.
+   * For static content, dedent is done at compile time.
+   */
+  public static function dedentRuntime(s:String):String {
+    var lines = s.split("\n");
+    if (lines.length <= 1) return s;
+
+    var minIndent = 999999;
+    var isFirst = true;
+    for (line in lines) {
+      if (StringTools.trim(line).length == 0) continue;
+      if (isFirst) { isFirst = false; continue; }
+
+      var indent = 0;
+      for (i in 0...line.length) {
+        var c = line.charAt(i);
+        if (c == " ") indent++;
+        else if (c == "\t") indent += 4;
+        else break;
+      }
+      if (indent < minIndent) minIndent = indent;
+    }
+
+    if (minIndent == 0 || minIndent == 999999) return s;
+
+    var result = [];
+    isFirst = true;
+    for (line in lines) {
+      if (isFirst) {
+        result.push(line);
+        isFirst = false;
+        continue;
+      }
+      if (StringTools.trim(line).length == 0) {
+        result.push("");
+      } else {
+        var removed = 0;
+        var start = 0;
+        for (i in 0...line.length) {
+          if (removed >= minIndent) break;
+          var c = line.charAt(i);
+          if (c == " ") { removed++; start++; }
+          else if (c == "\t") { removed += 4; start++; }
+          else break;
+        }
+        result.push(line.substr(start));
+      }
+    }
+    return result.join("\n");
   }
 }

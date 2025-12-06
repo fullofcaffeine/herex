@@ -162,10 +162,24 @@ class Example {
 
 ## How It Works
 
-1. **Parsing**: Haxe's parser recognizes `<heredoc>...</heredoc>` as a markup literal
+The macro generates optimized code at **compile time**:
+
+| Input | Generated Code |
+|-------|----------------|
+| `<heredoc>Hello!</heredoc>` | `"Hello!"` |
+| `<heredoc>Hello $name!</heredoc>` | `"Hello " + Std.string(name) + "!"` |
+| `<heredoc mode="trim">  text  </heredoc>` | `"text"` |
+
+**No runtime overhead** for simple cases - just plain string literals or concatenation.
+
+### Processing Steps
+
+1. **Parsing**: Haxe's parser recognizes `<heredoc>` as a markup literal
 2. **Interception**: SyntaxHub's `HeredocSyntax` plugin intercepts `@:markup` expressions
-3. **Transformation**: Content is parsed by tink_hxx (with Preserve whitespace mode)
-4. **Joining**: Children (text + interpolated values) are converted to strings and joined
+3. **Code Generation**: The macro generates optimized expressions:
+   - Static content → string literal
+   - Interpolated → direct `+` concatenation
+   - Whitespace modes → applied at compile time when possible
 
 ## Alternative: Explicit Macro
 
