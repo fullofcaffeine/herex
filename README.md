@@ -1,4 +1,4 @@
-# haxe_heredoc
+# herex
 
 Heredoc-like multi-line string literals with interpolation for Haxe, built on tink_hxx.
 

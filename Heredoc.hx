@@ -1,5 +1,5 @@
 /**
- * # Heredoc - Multi-line String Literals with Interpolation for Haxe
+ * # herex - Multi-line String Literals with Interpolation for Haxe
  *
  * This module provides heredoc-style multi-line strings with variable interpolation,
  * built on top of `tink_hxx` for parsing.

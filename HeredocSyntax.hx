@@ -8,7 +8,7 @@ import tink.macro.ClassBuilder;
 using tink.MacroApi;
 
 /**
- * SyntaxHub plugin that enables the preferred direct heredoc syntax.
+ * SyntaxHub plugin that enables the preferred direct herex syntax.
  *
  * This plugin allows you to write heredocs naturally without any wrapper:
  *
