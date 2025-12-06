@@ -36,3 +36,7 @@ dump/
 
 # Claude Code settings
 .claude/
+
+# Internal dev docs
+AGENTS.md
+heredoc_prd.md
