@@ -7,6 +7,10 @@ class TestMain {
 
 	static var property(default, null) = <heredoc>property initializer</heredoc>;
 
+	static function defaultArgument(value:String = <heredoc>default argument</heredoc>):String {
+		return value;
+	}
+
 	public static function main():Void {
 		basicInterpolation();
 		whitespaceModes();
@@ -162,8 +166,10 @@ class TestMain {
 		</heredoc>), "static heredocs fold to one string literal");
 		Assertions.equal("field initializer", fieldInitializer, "field initializer traversal");
 		Assertions.equal("property initializer", property, "property initializer traversal");
+		Assertions.equal("default argument", defaultArgument(), "method default argument traversal");
 		var closure = () -> <heredoc>closure body</heredoc>;
 		Assertions.equal("closure body", closure(), "closure traversal");
+		Assertions.value(true, AstAssertion.preservedMetadata(), "global traversal preserves unrelated AST metadata");
 		Assertions.equal("compatibility", Heredoc.hxx(<heredoc>compatibility</heredoc>), "default-package macro compatibility");
 		Assertions.equal("namespaced", herex.Heredoc.hxx(<heredoc>namespaced</heredoc>), "namespaced macro compatibility");
 		Assertions.equal("coexists", <dummy>coexists</dummy>, "non-Herex markup remains available to other build macros");

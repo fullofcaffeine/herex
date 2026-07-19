@@ -91,16 +91,7 @@ class HeredocBuilder {
 	public static macro function build():Array<Field> {
 		var fields = Context.getBuildFields();
 		for (field in fields) {
-			switch field.kind {
-				case FVar(type, expression):
-					field.kind = FVar(type, expression == null ? null : transformTree(expression));
-				case FProp(get, set, type, expression):
-					field.kind = FProp(get, set, type, expression == null ? null : transformTree(expression));
-				case FFun(fn):
-					if (fn.expr != null) {
-						fn.expr = transformTree(fn.expr);
-					}
-			}
+			transformField(field);
 		}
 		return fields;
 	}
@@ -128,17 +119,170 @@ class HeredocBuilder {
 	}
 
 	static function transformTree(expression:Expr):Expr {
-		return switch expression.expr {
+		switch expression.expr {
 			case EMeta(metadata, value) if (metadata.name == ":markup"):
 				switch value.expr {
 					case EConst(CString(raw, _)):
 						var tag = detectTag(raw);
-						tag == null ? ExprTools.map(expression, transformTree) : transformMarkup(raw, expression.pos, tag);
+						if (tag != null) {
+							var transformed = transformMarkup(raw, expression.pos, tag);
+							expression.expr = transformed.expr;
+							expression.pos = transformed.pos;
+							return expression;
+						}
 					default:
-						ExprTools.map(expression, transformTree);
 				}
 			default:
-				ExprTools.map(expression, transformTree);
+		}
+
+		transformExpressionShape(expression);
+		ExprTools.iter(expression, function(child) {
+			transformTree(child);
+		});
+		return expression;
+	}
+
+	static function transformField(field:Field):Void {
+		transformMetadata(field.meta);
+		switch field.kind {
+			case FVar(type, expression):
+				transformComplexType(type);
+				if (expression != null) {
+					transformTree(expression);
+				}
+			case FProp(_, _, type, expression):
+				transformComplexType(type);
+				if (expression != null) {
+					transformTree(expression);
+				}
+			case FFun(fn):
+				transformFunction(fn);
+		}
+	}
+
+	static function transformFunction(fn:Function):Void {
+		transformFunctionShape(fn);
+		for (argument in fn.args) {
+			if (argument.value != null) {
+				transformTree(argument.value);
+			}
+		}
+		if (fn.expr != null) {
+			transformTree(fn.expr);
+		}
+	}
+
+	static function transformFunctionShape(fn:Function):Void {
+		transformComplexType(fn.ret);
+		transformTypeParameters(fn.params);
+		for (argument in fn.args) {
+			transformMetadata(argument.meta);
+			transformComplexType(argument.type);
+		}
+	}
+
+	static function transformExpressionShape(expression:Expr):Void {
+		switch expression.expr {
+			case EVars(variables):
+				for (variable in variables) {
+					transformMetadata(variable.meta);
+					transformComplexType(variable.type);
+				}
+			case EFunction(_, fn):
+				transformFunctionShape(fn);
+			case ETry(_, catches):
+				for (caught in catches) {
+					transformComplexType(caught.type);
+				}
+			case ENew(type, _):
+				transformTypePath(type);
+			case ECast(_, type):
+				transformComplexType(type);
+			case ECheckType(_, type) | EIs(_, type):
+				transformComplexType(type);
+			case EMeta(metadata, _):
+				transformMetadataEntry(metadata);
+			default:
+		}
+	}
+
+	static function transformComplexType(type:Null<ComplexType>):Void {
+		if (type == null) {
+			return;
+		}
+		switch type {
+			case TPath(path):
+				transformTypePath(path);
+			case TFunction(arguments, result):
+				for (argument in arguments) {
+					transformComplexType(argument);
+				}
+				transformComplexType(result);
+			case TAnonymous(fields):
+				for (field in fields) {
+					transformField(field);
+				}
+			case TParent(inner) | TOptional(inner) | TNamed(_, inner):
+				transformComplexType(inner);
+			case TExtend(paths, fields):
+				for (path in paths) {
+					transformTypePath(path);
+				}
+				for (field in fields) {
+					transformField(field);
+				}
+			case TIntersection(types):
+				for (inner in types) {
+					transformComplexType(inner);
+				}
+		}
+	}
+
+	static function transformTypePath(path:TypePath):Void {
+		if (path.params == null) {
+			return;
+		}
+		for (parameter in path.params) {
+			switch parameter {
+				case TPType(type):
+					transformComplexType(type);
+				case TPExpr(expression):
+					transformTree(expression);
+			}
+		}
+	}
+
+	static function transformTypeParameters(parameters:Null<Array<TypeParamDecl>>):Void {
+		if (parameters == null) {
+			return;
+		}
+		for (parameter in parameters) {
+			transformMetadata(parameter.meta);
+			if (parameter.constraints != null) {
+				for (constraint in parameter.constraints) {
+					transformComplexType(constraint);
+				}
+			}
+			transformComplexType(parameter.defaultType);
+			transformTypeParameters(parameter.params);
+		}
+	}
+
+	static function transformMetadata(metadata:Null<Metadata>):Void {
+		if (metadata == null) {
+			return;
+		}
+		for (entry in metadata) {
+			transformMetadataEntry(entry);
+		}
+	}
+
+	static function transformMetadataEntry(entry:MetadataEntry):Void {
+		if (entry.params == null) {
+			return;
+		}
+		for (parameter in entry.params) {
+			transformTree(parameter);
 		}
 	}
 
