@@ -1,13 +1,19 @@
 {
-  "name": "herex",
-  "version": "1.0.0",
-  "description": "Multi-line string literals with interpolation for Haxe",
-  "url": "https://github.com/fullofcaffeine/herex",
-  "license": "MIT",
-  "dependencies": {
-    "tink_hxx": "",
-    "tink_macro": "",
-    "tink_syntaxhub": ""
-  },
-  "classPath": ""
+	"name": "herex",
+	"url": "https://github.com/fullofcaffeine/herex",
+	"license": "MIT",
+	"tags": [
+		"heredoc",
+		"macro",
+		"multiline",
+		"string"
+	],
+	"description": "Readable, indentation-aware heredoc expressions for Haxe",
+	"version": "0.0.0",
+	"releasenote": "Development version",
+	"contributors": [
+		"fullofcaffeine"
+	],
+	"classPath": "src",
+	"dependencies": {}
 }

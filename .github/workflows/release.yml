@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'fullofcaffeine/herex' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out the exact release commit and complete history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Install locked Haxe and release tools
+        run: npm ci
+      - name: Check formatting
+        run: npm run format:check
+      - name: Run complete test suite
+        run: npm test
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
+      - name: Scan complete Git history
+        run: npm run security:gitleaks
+      - name: Exercise deterministic package and Lix installation before versioning
+        run: |
+          node scripts/release/package.mjs --version 1.0.0 --output artifacts
+          node scripts/release/verify-package.mjs artifacts/herex-1.0.0.zip 1.0.0
+          node scripts/release/lix-consumer-smoke.mjs artifacts/herex-1.0.0.zip 1.0.0
+      - name: Require a clean release source tree
+        run: git diff --exit-code
+      - name: Analyze, package, and publish the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release

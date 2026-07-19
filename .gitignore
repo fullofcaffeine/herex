@@ -6,7 +6,14 @@ export/
 *.hl
 
 # Lix/Haxelib dependencies (managed by lix)
-haxe_libraries/
+haxe_libraries/*
+!haxe_libraries/formatter.hxml
+
+# Node and release tooling
+node_modules/
+.audit/
+artifacts/
+release-staging/
 
 # IDE and editor files
 .idea/
@@ -40,3 +47,8 @@ dump/
 # Internal dev docs
 AGENTS.md
 heredoc_prd.md
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

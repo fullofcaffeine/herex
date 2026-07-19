@@ -1,0 +1,17 @@
+{
+	"excludes": [
+		"\\.git",
+		"node_modules"
+	],
+	"indentation": {
+		"character": "tab",
+		"tabWidth": 4,
+		"trailingWhitespace": false
+	},
+	"lineEnds": {
+		"lineEndCharacter": "lf"
+	},
+	"emptyLines": {
+		"finalNewline": true
+	}
+}

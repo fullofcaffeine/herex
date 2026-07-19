@@ -1,6 +1,7 @@
 -cp src
 -cp test/src
 --macro herex.HeredocSyntax.use()
+--macro herex.HeredocSyntax.use()
 --macro DummySyntax.use()
 -main TestMain
 --interp

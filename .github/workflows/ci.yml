@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  security:
+    name: Secret history
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Install locked tooling without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Scan every Git commit with verified Gitleaks
+        run: npm run security:gitleaks
+
+  quality:
+    name: Haxe 4.3.7 quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Install locked Haxe and development tools
+        run: npm ci
+      - name: Check formatting
+        run: npm run format:check
+      - name: Run assertion, diagnostic, and cross-target suites
+        run: npm test
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
+      - name: Require a clean generated state
+        run: git diff --exit-code
+
+  package-smoke:
+    name: Lix package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Install locked tooling
+        run: npm ci
+      - name: Build deterministic release package
+        run: node scripts/release/package.mjs --version 1.0.0 --output artifacts
+      - name: Verify release package policy
+        run: node scripts/release/verify-package.mjs artifacts/herex-1.0.0.zip 1.0.0
+      - name: Install package with Lix and compile a consumer
+        run: node scripts/release/lix-consumer-smoke.mjs artifacts/herex-1.0.0.zip 1.0.0

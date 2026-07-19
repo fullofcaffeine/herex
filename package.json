@@ -1,0 +1,41 @@
+{
+	"name": "@fullofcaffeine/herex",
+	"version": "0.0.0-development",
+	"private": true,
+	"description": "Development, verification, and release tooling for Herex",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/fullofcaffeine/herex.git"
+	},
+	"engines": {
+		"node": ">=22.14.0"
+	},
+	"scripts": {
+		"postinstall": "lix download",
+		"setup:formatter": "lix install haxelib:formatter#1.18.0",
+		"format": "haxelib run formatter -s src -s test",
+		"format:check": "haxelib run formatter -s src -s test --check",
+		"test:unit": "haxe test.hxml && haxe test-direct.hxml && haxe test-alias.hxml",
+		"test:negative": "node scripts/test-negative.mjs",
+		"test:line-endings": "node scripts/test-line-endings.mjs",
+		"test:targets": "node scripts/test-targets.mjs",
+		"test:policy": "node scripts/ci/validate-policy.mjs",
+		"test": "npm run test:unit && npm run test:negative && npm run test:line-endings && npm run test:targets && npm run test:policy",
+		"package:release": "node scripts/release/package.mjs",
+		"package:verify": "node scripts/release/verify-package.mjs",
+		"package:smoke": "node scripts/release/lix-consumer-smoke.mjs",
+		"security:gitleaks": "node scripts/security/gitleaks.mjs",
+		"release": "semantic-release"
+	},
+	"devDependencies": {
+		"@semantic-release/commit-analyzer": "13.0.1",
+		"@semantic-release/github": "12.0.9",
+		"@semantic-release/release-notes-generator": "14.1.1",
+		"conventional-changelog-conventionalcommits": "9.3.1",
+		"fflate": "0.8.3",
+		"lix": "17.0.3",
+		"semantic-release": "25.0.6",
+		"semver": "7.8.5"
+	}
+}

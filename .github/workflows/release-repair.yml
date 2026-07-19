@@ -1,0 +1,64 @@
+name: Release repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing protected semantic tag whose draft release should be completed
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-repair-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.repository == 'fullofcaffeine/herex'
+    environment: release-repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out the requested existing tag
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.14.0
+          package-manager-cache: false
+      - name: Install locked tooling
+        run: npm ci
+      - name: Verify the protected tag is on main and checked out exactly
+        env:
+          REPAIR_TAG: ${{ inputs.tag }}
+        run: |
+          case "$REPAIR_TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "Invalid semantic tag" >&2; exit 1;; esac
+          test "$(git rev-list -n 1 "$REPAIR_TAG")" = "$(git rev-parse HEAD)"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor HEAD origin/main
+      - name: Re-run all release gates
+        run: |
+          npm run format:check
+          npm test
+          npm audit --audit-level=high
+          npm run security:gitleaks
+      - name: Rebuild and verify the existing version
+        env:
+          REPAIR_TAG: ${{ inputs.tag }}
+        run: |
+          VERSION="${REPAIR_TAG#v}"
+          node scripts/release/package.mjs --version "$VERSION" --output artifacts
+          node scripts/release/verify-package.mjs "artifacts/herex-$VERSION.zip" "$VERSION"
+          node scripts/release/lix-consumer-smoke.mjs "artifacts/herex-$VERSION.zip" "$VERSION"
+      - name: Complete only the existing draft, without replacing assets or moving its tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPAIR_TAG: ${{ inputs.tag }}
+        run: node scripts/release/repair.mjs "$REPAIR_TAG"
