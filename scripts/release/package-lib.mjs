@@ -1,6 +1,6 @@
 import {createHash} from "node:crypto";
 import {execFileSync} from "node:child_process";
-import {lstatSync, readdirSync, readFileSync} from "node:fs";
+import {lstatSync, readFileSync} from "node:fs";
 import path from "node:path";
 import {strToU8, unzipSync, zipSync} from "fflate";
 import semver from "semver";
@@ -22,12 +22,18 @@ export function buildArchive(version) {
 	}
 
 	const commit = execFileSync("git", ["rev-parse", "HEAD"], {encoding: "utf8"}).trim();
-	const entries = new Map();
-	for (const file of rootFiles) {
-		entries.set(file, readRegularFile(file));
+	const packagePaths = [...rootFiles, "haxelib.json", "assets", "src"];
+	const trackedFiles = listTrackedFiles(packagePaths);
+	for (const required of [...rootFiles, "haxelib.json"]) {
+		if (!trackedFiles.includes(required)) {
+			throw new Error(`Release input must be tracked by Git: ${required}`);
+		}
 	}
-	for (const directory of ["assets", "src"]) {
-		for (const file of walk(directory)) {
+	assertCleanPackageInputs(packagePaths);
+
+	const entries = new Map();
+	for (const file of trackedFiles) {
+		if (file !== "haxelib.json") {
 			entries.set(file, readRegularFile(file));
 		}
 	}
@@ -101,20 +107,18 @@ export function sha256(bytes) {
 	return createHash("sha256").update(bytes).digest("hex");
 }
 
-function walk(directory) {
-	const results = [];
-	for (const entry of readdirSync(directory, {withFileTypes: true}).sort((left, right) => left.name.localeCompare(right.name))) {
-		const name = path.posix.join(directory, entry.name);
-		if (entry.isSymbolicLink()) {
-			throw new Error(`Release input must not be a symlink: ${name}`);
-		}
-		if (entry.isDirectory()) {
-			results.push(...walk(name));
-		} else if (entry.isFile()) {
-			results.push(name);
-		}
+function listTrackedFiles(paths) {
+	return execFileSync("git", ["ls-files", "-z", "--", ...paths], {encoding: "utf8"})
+		.split("\0")
+		.filter((name) => name.length > 0)
+		.sort();
+}
+
+function assertCleanPackageInputs(paths) {
+	const status = execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all", "--", ...paths], {encoding: "utf8"}).trim();
+	if (status.length > 0) {
+		throw new Error(`Release inputs must exactly match tracked files at HEAD:\n${status}`);
 	}
-	return results;
 }
 
 function readRegularFile(name) {

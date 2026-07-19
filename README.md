@@ -50,7 +50,7 @@ The body is text, not XML or HXX. Haxe generics such as `Assigns<T>`, comparison
 Install the immutable, versioned GitHub Release asset with [Lix](https://github.com/lix-pm/lix.client):
 
 ```bash
-lix install https://www.github.com/fullofcaffeine/herex/releases/download/v1.0.1/herex-1.0.1.zip
+lix install https://www.github.com/fullofcaffeine/herex/releases/download/v1.0.2/herex-1.0.2.zip
 ```
 
 Keep the `www` in this command. Lix 17 currently mistakes bare `github.com` Release URLs for repository sources; GitHub's `www` endpoint reaches the same immutable asset through Lix's HTTPS installer. Every release verifies this exact path by compiling a clean consumer.

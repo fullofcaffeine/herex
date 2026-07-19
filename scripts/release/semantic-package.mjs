@@ -1,5 +1,5 @@
 import {execFileSync} from "node:child_process";
-import {readdirSync, rmSync} from "node:fs";
+import {readFileSync, readdirSync, rmSync} from "node:fs";
 import process from "node:process";
 
 export async function verifyConditions(_pluginConfig, context) {
@@ -17,6 +17,10 @@ export async function prepare(_pluginConfig, context) {
 	const head = git("rev-parse", "HEAD");
 	if (context.nextRelease.gitHead !== head) {
 		throw new Error(`semantic-release selected ${context.nextRelease.gitHead}, but the checked-out commit is ${head}`);
+	}
+	const installUrl = `https://www.github.com/fullofcaffeine/herex/releases/download/v${version}/herex-${version}.zip`;
+	if (!readFileSync("README.md", "utf8").includes(installUrl)) {
+		throw new Error(`README must document the release selected by semantic-release: ${installUrl}`);
 	}
 	rmSync("artifacts", {recursive: true, force: true});
 	run(process.execPath, ["scripts/release/package.mjs", "--version", version, "--output", "artifacts"]);

@@ -14,4 +14,8 @@ Herex is not submitted to the Haxelib registry. The supported installation sourc
 
 The public Lix smoke test rewrites GitHub API asset URLs from `github.com` to `www.github.com`. This is intentional: Lix 17 intercepts the bare host as a repository source and rejects Release asset paths before its generic HTTPS installer can handle them. Both hosts serve the same immutable GitHub asset.
 
+Before a version-producing commit reaches `main`, update the version in README's Lix URL to the semantic version implied by the conventional commits since the last tag. The release prepare hook rejects a stale or speculative URL that does not equal `nextRelease.version`.
+
+Package inputs must be Git-tracked regular files and exactly match `HEAD`. The packager rejects modified, deleted, or untracked content under its root-file manifest, `assets/`, and `src/` before it writes commit provenance.
+
 Published `v*` tags and release assets are immutable. The reviewer-protected `release-repair` workflow may finish an incomplete draft for an existing protected tag; it must never move a tag, derive a new version, or replace a published asset.

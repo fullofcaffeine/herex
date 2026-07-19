@@ -29,17 +29,18 @@ requireCondition(read("extraParams.hxml").trim() === "--macro herex.HeredocSynta
 requireIncludes(read("haxe_libraries/formatter.hxml"), "formatter#1.18.0", "The formatter lock must remain exact");
 
 const readme = read("README.md");
-requireIncludes(
-	readme,
-	"https://www.github.com/fullofcaffeine/herex/releases/download/v1.0.1/herex-1.0.1.zip",
-	"README must lead with the Lix-compatible versioned GitHub Release asset",
-);
+const installUrl = readme.match(/https:\/\/www\.github\.com\/fullofcaffeine\/herex\/releases\/download\/v(\d+\.\d+\.\d+)\/herex-(\d+\.\d+\.\d+)\.zip/);
+requireCondition(installUrl != null && installUrl[1] === installUrl[2], "README must lead with a self-consistent, Lix-compatible versioned Release URL");
 requireIncludes(readme, "-lib herex", "README must document one-line project activation");
 requireIncludes(readme, "<hd", "README must document the compact built-in alias");
 requireIncludes(read("AGENTS.example.md"), "Do not mechanically convert", "Agent guidance must preserve the heredoc/concatenation balance");
 
 const lixSmoke = read("scripts/release/lix-consumer-smoke.mjs");
 requireIncludes(lixSmoke, 'parsed.hostname = "www.github.com"', "Public Lix verification must avoid Lix 17's bare GitHub host interceptor");
+
+const packageBuilder = read("scripts/release/package-lib.mjs");
+requireIncludes(packageBuilder, '["ls-files", "-z"', "Release archives must enumerate Git-tracked inputs");
+requireIncludes(packageBuilder, '"--untracked-files=all"', "Release archives must reject dirty and untracked package inputs");
 
 const releaseConfiguration = read("release.config.mjs");
 requireIncludes(releaseConfiguration, 'path: "artifacts/herex-*.zip"', "GitHub release assets must use glob paths supported by the publisher");
