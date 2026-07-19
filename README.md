@@ -50,7 +50,7 @@ The body is text, not XML or HXX. Haxe generics such as `Assigns<T>`, comparison
 Install the immutable, versioned GitHub Release asset with [Lix](https://github.com/lix-pm/lix.client):
 
 ```bash
-lix install https://github.com/fullofcaffeine/herex/releases/download/v1.0.0/herex-1.0.0.zip
+lix install https://github.com/fullofcaffeine/herex/releases/download/v1.0.1/herex-1.0.1.zip
 ```
 
 Then add one line to the project HXML:

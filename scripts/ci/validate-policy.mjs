@@ -29,10 +29,14 @@ requireCondition(read("extraParams.hxml").trim() === "--macro herex.HeredocSynta
 requireIncludes(read("haxe_libraries/formatter.hxml"), "formatter#1.18.0", "The formatter lock must remain exact");
 
 const readme = read("README.md");
-requireIncludes(readme, "releases/download/v1.0.0/herex-1.0.0.zip", "README must lead with a versioned GitHub Release asset");
+requireIncludes(readme, "releases/download/v1.0.1/herex-1.0.1.zip", "README must lead with the first installable versioned GitHub Release asset");
 requireIncludes(readme, "-lib herex", "README must document one-line project activation");
 requireIncludes(readme, "<hd", "README must document the compact built-in alias");
 requireIncludes(read("AGENTS.example.md"), "Do not mechanically convert", "Agent guidance must preserve the heredoc/concatenation balance");
+
+const releaseConfiguration = read("release.config.mjs");
+requireIncludes(releaseConfiguration, 'path: "artifacts/herex-*.zip"', "GitHub release assets must use glob paths supported by the publisher");
+requireCondition(!releaseConfiguration.includes('path: "artifacts/herex-${'), "GitHub release asset paths must not contain uninterpreted templates");
 
 for (const file of walk("scripts").filter((name) => name.endsWith(".mjs"))) {
 	const result = spawnSync(process.execPath, ["--check", file], {encoding: "utf8"});

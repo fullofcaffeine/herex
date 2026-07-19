@@ -14,9 +14,8 @@ const publicUrl = sourceArgument.startsWith("https://") ? sourceArgument : null;
 const archivePath = publicUrl == null ? path.resolve(sourceArgument) : null;
 const archive = archivePath == null ? null : readFileSync(archivePath);
 const temporaryDirectory = mkdtempSync(path.join(os.tmpdir(), "herex-lix-consumer-"));
-const executableSuffix = process.platform === "win32" ? ".cmd" : "";
-const lix = path.resolve("node_modules", ".bin", `lix${executableSuffix}`);
-const haxe = path.resolve("node_modules", ".bin", `haxe${executableSuffix}`);
+const lixEntry = path.resolve("node_modules", "lix", "bin", "lix.js");
+const haxeEntry = path.resolve("node_modules", "lix", "bin", "haxeshim.js");
 const server = createServer((request, response) => {
 	if (archive == null || request.url !== `/herex-${version}.zip`) {
 		response.writeHead(404).end();
@@ -86,9 +85,9 @@ http.get = function patchedGet(options, ...rest) {
 			NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --require=${localPortPatch}`.trim(),
 		};
 	}
-	await run(lix, ["install", url], temporaryDirectory, installEnvironment);
-	await run(lix, ["download"], temporaryDirectory);
-	await run(haxe, ["build.hxml"], temporaryDirectory);
+	await run(process.execPath, [lixEntry, "install", url], temporaryDirectory, installEnvironment);
+	await run(process.execPath, [lixEntry, "download"], temporaryDirectory);
+	await run(process.execPath, [haxeEntry, "build.hxml"], temporaryDirectory);
 	process.stdout.write(`Lix installed and compiled ${archivePath == null ? url : path.basename(archivePath)} using only -lib herex\n`);
 } finally {
 	if (server.listening) {

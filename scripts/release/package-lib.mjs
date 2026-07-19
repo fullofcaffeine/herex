@@ -122,6 +122,9 @@ function readRegularFile(name) {
 	if (!details.isFile() || details.isSymbolicLink()) {
 		throw new Error(`Release input must be a regular file: ${name}`);
 	}
+	if (name === "LICENSE" || [".hx", ".hxml", ".json", ".md"].includes(path.extname(name))) {
+		return strToU8(readFileSync(name, "utf8").replace(/\r\n?/g, "\n"));
+	}
 	return new Uint8Array(readFileSync(name));
 }
 
