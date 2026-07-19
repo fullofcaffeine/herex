@@ -85,15 +85,27 @@ http.get = function patchedGet(options, ...rest) {
 			NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --require=${localPortPatch}`.trim(),
 		};
 	}
-	await run(process.execPath, [lixEntry, "install", url], temporaryDirectory, installEnvironment);
+	const installUrl = lixInstallUrl(url);
+	await run(process.execPath, [lixEntry, "install", installUrl], temporaryDirectory, installEnvironment);
 	await run(process.execPath, [lixEntry, "download"], temporaryDirectory);
 	await run(process.execPath, [haxeEntry, "build.hxml"], temporaryDirectory);
-	process.stdout.write(`Lix installed and compiled ${archivePath == null ? url : path.basename(archivePath)} using only -lib herex\n`);
+	process.stdout.write(`Lix installed and compiled ${archivePath == null ? installUrl : path.basename(archivePath)} using only -lib herex\n`);
 } finally {
 	if (server.listening) {
 		await new Promise((resolve) => server.close(resolve));
 	}
 	rmSync(temporaryDirectory, {recursive: true, force: true});
+}
+
+function lixInstallUrl(url) {
+	const parsed = new URL(url);
+	// Lix 17 case-sensitively intercepts bare github.com URLs as repository
+	// sources before its generic HTTPS resolver. Release asset paths then fail
+	// that repository parser. GitHub's www host serves the same immutable asset.
+	if (parsed.protocol === "https:" && parsed.hostname === "github.com") {
+		parsed.hostname = "www.github.com";
+	}
+	return parsed.toString();
 }
 
 function run(command, args, cwd, env = process.env) {

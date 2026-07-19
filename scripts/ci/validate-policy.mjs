@@ -29,10 +29,17 @@ requireCondition(read("extraParams.hxml").trim() === "--macro herex.HeredocSynta
 requireIncludes(read("haxe_libraries/formatter.hxml"), "formatter#1.18.0", "The formatter lock must remain exact");
 
 const readme = read("README.md");
-requireIncludes(readme, "releases/download/v1.0.1/herex-1.0.1.zip", "README must lead with the first installable versioned GitHub Release asset");
+requireIncludes(
+	readme,
+	"https://www.github.com/fullofcaffeine/herex/releases/download/v1.0.1/herex-1.0.1.zip",
+	"README must lead with the Lix-compatible versioned GitHub Release asset",
+);
 requireIncludes(readme, "-lib herex", "README must document one-line project activation");
 requireIncludes(readme, "<hd", "README must document the compact built-in alias");
 requireIncludes(read("AGENTS.example.md"), "Do not mechanically convert", "Agent guidance must preserve the heredoc/concatenation balance");
+
+const lixSmoke = read("scripts/release/lix-consumer-smoke.mjs");
+requireIncludes(lixSmoke, 'parsed.hostname = "www.github.com"', "Public Lix verification must avoid Lix 17's bare GitHub host interceptor");
 
 const releaseConfiguration = read("release.config.mjs");
 requireIncludes(releaseConfiguration, 'path: "artifacts/herex-*.zip"', "GitHub release assets must use glob paths supported by the publisher");
